@@ -1,1 +1,1 @@
-# crop_identification_with_satellite_data
+# CROP IDENTIFICATION WITH SATELLITE DATA
