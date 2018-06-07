@@ -1,6 +1,5 @@
 from osgeo import osr, gdal
 from openpyxl.workbook import Workbook
-#from pandas import Dataframe, read_csv
 import sys
 import pandas as pd
 
@@ -53,25 +52,21 @@ def YRN(i,j,sd_gt, sd_cs, crops):
 
 def processsat(file, crops = crops):
     croplists1 = {'a':[]}
-    for num, name in crops.items():
-        croplists1[name] = []
-    del croplists1['a']
     croplists2 = {'a':[]}
-    for num, name in crops.items():
-        croplists2[name] = []
-    del croplists2['a']
     croplists3 = {'a':[]}
-    for num, name in crops.items():
-        croplists3[name] = []
-    del croplists3['a']
     croplists4 = {'a':[]}
-    for num, name in crops.items():
+    for nums, name in crops.items():
+        croplists1[name] = []
+        croplists2[name] = []
+        croplists3[name] = []
         croplists4[name] = []
+    del croplists1['a']
+    del croplists2['a']
+    del croplists3['a']
     del croplists4['a']
     sd = gdal.Open(file)
     sd_ncols = sd.RasterXSize
     sd_nrows = sd.RasterYSize
-    sd_nbands = sd.RasterCount 
     sd_gt = sd.GetGeoTransform()
     sd_data1 = sd.GetRasterBand(1).ReadAsArray(0, 0, sd_ncols, sd_nrows)
     sd_data2 = sd.GetRasterBand(2).ReadAsArray(0, 0, sd_ncols, sd_nrows)
@@ -79,6 +74,8 @@ def processsat(file, crops = crops):
     sd_data4 = sd.GetRasterBand(4).ReadAsArray(0, 0, sd_ncols, sd_nrows)
     sd_cs= osr.SpatialReference()
     sd_cs.ImportFromWkt(sd.GetProjectionRef())
+    l = 1
+    totalsize = sd_ncols*sd_nrows
     for i in range(sd_ncols):
         for j in range(sd_nrows):
             a = sd_data1[j][i]; b = sd_data2[j][i]; c = sd_data3[j][i]; d = sd_data4[j][i]
@@ -89,6 +86,7 @@ def processsat(file, crops = crops):
                     croplists2[yrn].append(b)
                     croplists3[yrn].append(c)
                     croplists4[yrn].append(d)
+            l = l+1
     return croplists1, croplists2, croplists3, croplists4
 
 
@@ -99,6 +97,6 @@ for file in satfiles:
         babydatasets[cropname] = babydatasets[cropname] + list(zip(croplists1[cropname], croplists2[cropname], croplists3[cropname], croplists4[cropname]))
     del croplists1; del croplists2; del croplists3; del croplists4
 
-for num , cropname in crops.items():
-    df = pd.DataFrame(data = babydatasets[cropname], columns=['band1', 'band2','band3', 'band4'])
-    df.to_csv(cropname+'.csv',index=False,header=False)
+for name, dataset in babydatasets.items():
+    df = pd.DataFrame(data = dataset, columns=['band1','band2','band3', 'band4'])
+    df.to_csv(cropname+'.csv',index=False,header = False)
