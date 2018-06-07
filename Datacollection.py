@@ -71,7 +71,6 @@ def processsat(file, crops = crops):
     sd = gdal.Open(file)
     sd_ncols = sd.RasterXSize
     sd_nrows = sd.RasterYSize
-    #print (sd_ncols*sd_nrows)
     sd_nbands = sd.RasterCount 
     sd_gt = sd.GetGeoTransform()
     sd_data1 = sd.GetRasterBand(1).ReadAsArray(0, 0, sd_ncols, sd_nrows)
@@ -91,7 +90,6 @@ def processsat(file, crops = crops):
                     croplists3[yrn].append(c)
                     croplists4[yrn].append(d)
     return croplists1, croplists2, croplists3, croplists4
-    del croplists1; del croplists2; del croplists3; del croplists4;
 
 
 satfiles = ['./Satdata1/Satdata1/Satdata1.tif','./Satdata2/Satdata2/Satdata2.tif']
@@ -99,7 +97,7 @@ for file in satfiles:
     croplists1,croplists2, croplists3, croplists4 = processsat(file)
     for num , cropname in crops.items():
         babydatasets[cropname] = babydatasets[cropname] + list(zip(croplists1[cropname], croplists2[cropname], croplists3[cropname], croplists4[cropname]))
-    del croplists1; del croplists2; del croplists3; del croplists4;
+    del croplists1; del croplists2; del croplists3; del croplists4
 
 for num , cropname in crops.items():
     df = pd.DataFrame(data = babydatasets[cropname], columns=['band1', 'band2','band3', 'band4'])
