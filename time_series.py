@@ -12,8 +12,8 @@ def create_ogr_polygons(poly_corners):
 	for key, value in poly_corners.items():
 		ring = ogr.Geometry(ogr.wkbLinearRing)
 		for i in value:
-			ring.AddPoint(i[0],i[1])
-		ring.AddPoint(value[0][0], value[0][1])
+			ring.AddPoint(i[0]*10000,i[1]*10000)
+		ring.AddPoint(value[0][0]*10000, value[0][1]*10000)
 		poly = ogr.Geometry(ogr.wkbPolygon)
 		poly.AddGeometry(ring)
 		ogr_poly[key] = poly
@@ -82,15 +82,14 @@ def each_file_checker(file, i,j, sdb):
 	lon = (min([i[1] for i in s]),max([i[1] for i in s]))
 	area = 0.0; total_band_values = np.array([0,0,0,0,0])
 	for i in range(lat[0], lat[1]+1):
-		for j in range(lon[0], lat[1]+1):
+		for j in range(lon[0], lon[1]+1):
 			x = (i,j) #sd_cs, sd_gt
 			if i>=0 and i< sd_ncols and j >= 0 and j< sd_nrows:
 				band_value = gdal_array.DatasetReadAsArray(sd,i,j ,1, 1)[:,0,0]
 				area2 = common_area(x,l, sd_cs, sd_gt, sdb_gt, sdb_cs)
 				if area2!=0.0 and (band_value == np.array([0,0,0,0,0])).all():
 					return np.array([0,0,0,0,0])
-				area = area + area2; total_band_values = total_band_values + band_value*area
-	#print(area)
+				area = area + area2; total_band_values = total_band_values + band_value*area2
 	if area != 0:
 		return total_band_values/area
 	else: return np.array([0,0,0,0,0])
@@ -116,6 +115,7 @@ def check_other_month_satdata(i, j, sdb):
 		if (bandvalues != np.array([0,0,0,0,0])).any():
 			band_values[month] = bandvalues
 		else:
+			print('not found in month', month)
 			return {}
 	return band_values
 
@@ -168,7 +168,7 @@ def save_now(ss,pra, pick_pixel,base_month, data, linad):
 
 def check(pixel,ss,pra,pick_pixel,base_month, linad, sdb,sdb_gt, sdb_cs, crops,data,fil):
 	print(pra)
-	if pra%10000 ==0:
+	if pra%1000 ==0:
 		print('saving', pra)
 		save_now(ss,pra, pick_pixel,base_month, data, linad)
 	i = pixel[0]; j =pixel[1]
@@ -176,6 +176,7 @@ def check(pixel,ss,pra,pick_pixel,base_month, linad, sdb,sdb_gt, sdb_cs, crops,d
 	#if (band_values_base != np.array([0,0,0,0,0])).any():
 	crop_name = check_crop_data(i, j, sdb_gt, sdb_cs, crops)
 	if crop_name != 'USELESS':
+		print(crop_name)
 		band_values = check_other_month_satdata(i,j, sdb)
 		if len(band_values) !=0:
 			band_values[base_month] = band_values_base
