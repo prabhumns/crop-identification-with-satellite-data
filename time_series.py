@@ -4,7 +4,6 @@ import numpy as np
 from numpy.linalg import inv
 import pickle
 from random import shuffle
-gdal.UseExceptions() 
 base_month = '12'
 crops = {1:'CORN',4:'SORGHUM', 5:'SOYABEENS', 13:'POP OR ORN', 36:'ALFALFA', 28:'OATS', 27:'RYE', 53:'PEAS', 111:'WATER BODY', 121:'DEVELOPED', 122:'DEVELOPED', 123:'DEVELOPED', 124:'DEVELOPED',141:'FOREST', 142:'FOREST',243:'CABBAGE' }
 
@@ -14,6 +13,7 @@ def create_ogr_polygons(poly_corners):
 		ring = ogr.Geometry(ogr.wkbLinearRing)
 		for i in value:
 			ring.AddPoint(i[0],i[1])
+		ring.AddPoint(value[0][0], value[0][1])
 		poly = ogr.Geometry(ogr.wkbPolygon)
 		poly.AddGeometry(ring)
 		ogr_poly[key] = poly
@@ -39,8 +39,12 @@ def calculate2(i, g):
 	A = np.mat([[g[1],g[2]],[g[4],g[5]]])
 	X = inv(A) * B
 	return (X[0,0], X[1,0])
-
-def convert_to_lat_lon(poly_corners, sd_cs, sd_gt):
+	
+def common_area(w,l, sd_cs, sd_gt, sdb_gt, sdb_cs):
+	x= w[0]; y = w[1]
+	poly_corners = {}
+	poly_corners[1] = [calculate2(Convert(i,sdb_gt, sdb_cs, sd_cs),sd_gt) for i in l]
+	poly_corners[2] = [(x,y),(x+1,y),(x+1,y+1),(x,y+1)]
 	wgs84_wkt = """
 	GEOGCS["WGS 84",
 		DATUM["WGS_1984",
@@ -52,24 +56,15 @@ def convert_to_lat_lon(poly_corners, sd_cs, sd_gt):
 		UNIT["degree",0.01745329251994328,
 			AUTHORITY["EPSG","9122"]],
 		AUTHORITY["EPSG","4326"]]"""
-
 	new_cs = osr.SpatialReference()
 	new_cs.ImportFromWkt(wgs84_wkt)  
-	poly_corner = {}
-	for key, value in poly_corners.items():
-		for i in value:
-			poly_corner[key] = Convert(i, sdb_gt, sdb_cs, new_cs)
-	return poly_corner
-	
-def common_area(w,l, sd_cs, sd_gt, sdb_gt, sdb_cs):
-	x= w[0]; y = w[1]
-	poly_corners = {}
-	poly_corners[1] = [calculate2(Convert(i,sdb_gt, sdb_cs, sd_cs),sd_gt) for i in l]
-	poly_corners[2] = [(x,y),(x+1,y),(x,y+1),(x+1,y+1)]
-	poly_corner = convert_to_lat_lon(poly_corners,sd_cs, sd_gt)
+	poly_corner = {key:[Convert(i, sd_gt, sd_cs, new_cs) for i in value]for key, value in poly_corners.items()}
 	ogr_polygons = create_ogr_polygons(poly_corner)
 	intersection = ogr_polygons[1].Intersection(ogr_polygons[2])
-	return intersection.GetArea() 
+	try: 
+		return intersection.GetArea()
+	except AttributeError:
+		return 0.0
 
 def each_file_checker(file, i,j, sdb):
 	sdb_gt = sdb.GetGeoTransform()
@@ -79,20 +74,23 @@ def each_file_checker(file, i,j, sdb):
 	sd_gt = sd.GetGeoTransform()
 	sd_cs = osr.SpatialReference()
 	sd_cs.ImportFromWkt(sd.GetProjectionRef())
-	l = [(i,j),(i+1,j),(i,j+1),(i+1,j+1)] #sdb_gt, sdb_cs
+	sd_ncols = sd.RasterXSize
+	sd_nrows = sd.RasterYSize	
+	l = [(i,j),(i+1,j),(i+1,j+1),(i,j+1)] #sdb_gt, sdb_cs
 	s = [calculate(Convert(ton, old_gt = sdb_gt, old_cs = sdb_cs, new_cs=sd_cs), sd_gt) for ton in l] #sd_cs, #sd_gt
 	lat = (min([i[0] for i in s]),max([i[0] for i in s]))
 	lon = (min([i[1] for i in s]),max([i[1] for i in s]))
-	area = 0; total_band_values = np.array([0,0,0,0,0])
+	area = 0.0; total_band_values = np.array([0,0,0,0,0])
 	for i in range(lat[0], lat[1]+1):
 		for j in range(lon[0], lat[1]+1):
 			x = (i,j) #sd_cs, sd_gt
-			band_value = gdal_array.DatasetReadAsArray(sd,i,j ,1, 1)[:,0,0]
-			area2 = common_area(x,l, sd_cs, sd_gt, sdb_gt, sdb_cs)
-			#print(area2)
-			if area2!=0 and (band_value == np.array([0,0,0,0,0])).all():
-				return np.array([0,0,0,0,0])
-			area = area + area2; total_band_values = total_band_values + band_value*area
+			if i>=0 and i< sd_ncols and j >= 0 and j< sd_nrows:
+				band_value = gdal_array.DatasetReadAsArray(sd,i,j ,1, 1)[:,0,0]
+				area2 = common_area(x,l, sd_cs, sd_gt, sdb_gt, sdb_cs)
+				if area2!=0.0 and (band_value == np.array([0,0,0,0,0])).all():
+					return np.array([0,0,0,0,0])
+				area = area + area2; total_band_values = total_band_values + band_value*area
+	#print(area)
 	if area != 0:
 		return total_band_values/area
 	else: return np.array([0,0,0,0,0])
@@ -101,13 +99,11 @@ def any_band_value(i, j, sdb, month):
 	lis = os.listdir('./satdata/'+month)
 	for each_file in lis:
 		if each_file[-4:] == '.tif':
-			try:
-				each_file2 = './satdata/'+month+'/'+each_file
-				band_values = each_file_checker(each_file2, i,j, sdb)
-			except TypeError:
-				continue			
+			each_file2 = './satdata/'+month+'/'+each_file
+			band_values = each_file_checker(each_file2, i,j, sdb)
 			if (band_values != np.array([0,0,0,0,0])).any():
 				return band_values
+			else: continue
 	return np.array([0,0,0,0,0])
 			
 
@@ -171,7 +167,8 @@ def save_now(ss,pra, pick_pixel,base_month, data, linad):
 	file_object.close()
 
 def check(pixel,ss,pra,pick_pixel,base_month, linad, sdb,sdb_gt, sdb_cs, crops,data,fil):
-	if pra%1000 ==0:
+	print(pra)
+	if pra%10000 ==0:
 		print('saving', pra)
 		save_now(ss,pra, pick_pixel,base_month, data, linad)
 	i = pixel[0]; j =pixel[1]
