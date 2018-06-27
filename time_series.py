@@ -11,8 +11,8 @@ def create_ogr_polygons(poly_corners):
 	ogr_poly = {}
 	for key, value in poly_corners.items():
 		ring = ogr.Geometry(ogr.wkbLinearRing)
-		for i in value:
-			ring.AddPoint(i[0]*10000,i[1]*10000)
+		for t in value:
+			ring.AddPoint(t[0]*10000,t[1]*10000)
 		ring.AddPoint(value[0][0]*10000, value[0][1]*10000)
 		poly = ogr.Geometry(ogr.wkbPolygon)
 		poly.AddGeometry(ring)
@@ -21,21 +21,21 @@ def create_ogr_polygons(poly_corners):
 
 
 def Convert(k, old_gt, old_cs, new_cs):
-	i = k[0]; j= k[1]
+	a = k[0]; s= k[1]
 	transform = osr.CoordinateTransformation(old_cs,new_cs)
-	o1 = old_gt[0] + i*old_gt[1] + j*old_gt[2]
-	o2 = old_gt[3] + i*old_gt[4] + j*old_gt[5]
-	l = transform.TransformPoint(o1,o2)
-	return (l[0],l[1])
+	o1 = old_gt[0] + a*old_gt[1] + s*old_gt[2]
+	o2 = old_gt[3] + a*old_gt[4] + s*old_gt[5]
+	d = transform.TransformPoint(o1,o2)
+	return (d[0],d[1])
 
-def calculate(i, g):
-	B= np.mat([[i[0]-g[0]],[i[1]-g[3]]])
+def calculate(a, g):
+	B= np.mat([[a[0]-g[0]],[a[1]-g[3]]])
 	A = np.mat([[g[1],g[2]],[g[4],g[5]]])
 	X = inv(A) * B
 	return (int(X[0]), int(X[1]))
 
-def calculate2(i, g):
-	B= np.mat([[i[0]-g[0]],[i[1]-g[3]]])
+def calculate2(a, g):
+	B= np.mat([[a[0]-g[0]],[a[1]-g[3]]])
 	A = np.mat([[g[1],g[2]],[g[4],g[5]]])
 	X = inv(A) * B
 	return (X[0,0], X[1,0])
@@ -43,7 +43,7 @@ def calculate2(i, g):
 def common_area(w,l, sd_cs, sd_gt, sdb_gt, sdb_cs):
 	x= w[0]; y = w[1]
 	poly_corners = {}
-	poly_corners[1] = [calculate2(Convert(i,sdb_gt, sdb_cs, sd_cs),sd_gt) for i in l]
+	poly_corners[1] = [calculate2(Convert(a,sdb_gt, sdb_cs, sd_cs),sd_gt) for a in l]
 	poly_corners[2] = [(x,y),(x+1,y),(x+1,y+1),(x,y+1)]
 	wgs84_wkt = """
 	GEOGCS["WGS 84",
@@ -58,7 +58,7 @@ def common_area(w,l, sd_cs, sd_gt, sdb_gt, sdb_cs):
 		AUTHORITY["EPSG","4326"]]"""
 	new_cs = osr.SpatialReference()
 	new_cs.ImportFromWkt(wgs84_wkt)  
-	poly_corner = {key:[Convert(i, sd_gt, sd_cs, new_cs) for i in value]for key, value in poly_corners.items()}
+	poly_corner = {key:[Convert(s, sd_gt, sd_cs, new_cs) for s in value]for key, value in poly_corners.items()}
 	ogr_polygons = create_ogr_polygons(poly_corner)
 	intersection = ogr_polygons[1].Intersection(ogr_polygons[2])
 	try: 
@@ -78,14 +78,14 @@ def each_file_checker(file, i,j, sdb):
 	sd_nrows = sd.RasterYSize	
 	l = [(i,j),(i+1,j),(i+1,j+1),(i,j+1)] #sdb_gt, sdb_cs
 	s = [calculate(Convert(ton, old_gt = sdb_gt, old_cs = sdb_cs, new_cs=sd_cs), sd_gt) for ton in l] #sd_cs, #sd_gt
-	lat = (min([i[0] for i in s]),max([i[0] for i in s]))
-	lon = (min([i[1] for i in s]),max([i[1] for i in s]))
+	lat = (min([I[0] for I in s]),max([I[0] for I in s]))
+	lon = (min([I[1] for I in s]),max([I[1] for I in s]))
 	area = 0.0; total_band_values = np.array([0,0,0,0,0])
-	for i in range(lat[0], lat[1]+1):
-		for j in range(lon[0], lon[1]+1):
-			x = (i,j) #sd_cs, sd_gt
-			if i>=0 and i< sd_ncols and j >= 0 and j< sd_nrows:
-				band_value = gdal_array.DatasetReadAsArray(sd,i,j ,1, 1)[:,0,0]
+	for q in range(lat[0], lat[1]+1):
+		for w in range(lon[0], lon[1]+1):
+			x = (q,w) #sd_cs, sd_gt
+			if q>=0 and q< sd_ncols and w >= 0 and w< sd_nrows:
+				band_value = gdal_array.DatasetReadAsArray(sd,q,w ,1, 1)[:,0,0]
 				area2 = common_area(x,l, sd_cs, sd_gt, sdb_gt, sdb_cs)
 				if area2!=0.0 and (band_value == np.array([0,0,0,0,0])).all():
 					return np.array([0,0,0,0,0])
@@ -115,7 +115,7 @@ def check_other_month_satdata(i, j, sdb):
 		if (bandvalues != np.array([0,0,0,0,0])).any():
 			band_values[month] = bandvalues
 		else:
-			print('not found in month', month)
+			#print('not found in month', month)
 			return {}
 	return band_values
 
@@ -156,32 +156,31 @@ def check_crop_data(i,j,sdb_gt,sdb_cs, crops):
 		return 'USELESS'
 
 def save_now(ss,pra, pick_pixel,base_month, data, linad):
-	for i, l in data.items():
-		print(i, 'has', len(l), 'examples')
+	for key, value in data.items():
+		print(key, 'has', len(value), 'examples')
 	dicti['looped_till'] = {'sss':ss, 'last_stop': pra+1, 'pick_pixel':pick_pixel}
 	dicti['base_month'] = base_month
 	dicti['data'] = data
 	dicti['list of base month files'] = linad
-	file_object = open('data_collect.pkl', 'wb')
+	file_object = open('data_collect22.pkl', 'wb')
 	pickle.dump(dicti, file_object)
 	file_object.close()
 
 def check(pixel,ss,pra,pick_pixel,base_month, linad, sdb,sdb_gt, sdb_cs, crops,data,fil):
-	print(pra)
-	if pra%1000 ==0:
+	if pra%10000 ==0:
 		print('saving', pra)
 		save_now(ss,pra, pick_pixel,base_month, data, linad)
+		print('b')
 	i = pixel[0]; j =pixel[1]
 	band_values_base = sdb_data[:,j,i]
 	#if (band_values_base != np.array([0,0,0,0,0])).any():
 	crop_name = check_crop_data(i, j, sdb_gt, sdb_cs, crops)
 	if crop_name != 'USELESS':
-		print(crop_name)
+		#print(crop_name)
 		band_values = check_other_month_satdata(i,j, sdb)
 		if len(band_values) !=0:
 			band_values[base_month] = band_values_base
 			band_values['info'] = {'base_month': base_month, 'file_name':fil, 'pixel_position': (i,j)}
-			print('success', crop_name)
 			try:
 				data[crop_name].append(band_values)
 			except KeyError:
@@ -200,7 +199,7 @@ if __name__ == '__main__':
 	month_folders = {month : os.listdir('./satdata/' +month) for month in os.listdir('./satdata')}
 	linad = month_folders[base_month]
 	try:
-		file_object = open('data_collect.pkl', 'rb')
+		file_object = open('data_collect22.pkl', 'rb')
 		dicti = pickle.load(file_object)
 		file_object.close()
 		data = dicti['data']
