@@ -80,7 +80,7 @@ def check_centre(i,j):
     else:
         return []
 
-data = {}
+data = {}; crop_name = 'hello'
 sdb = gdal.Open(sat_file)
 sdb_ncols = sdb.RasterXSize
 sdb_nrows = sdb.RasterYSize
