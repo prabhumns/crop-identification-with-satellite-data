@@ -80,7 +80,7 @@ def check_centre(i,j):
     else:
         return []
 
-data = {}; crop_name = 'hello'
+data = {}
 sdb = gdal.Open(sat_file)
 sdb_ncols = sdb.RasterXSize
 sdb_nrows = sdb.RasterYSize
@@ -91,7 +91,6 @@ sdb_data = gdal_array.DatasetReadAsArray(sdb,0,0,sdb_ncols, sdb_nrows)
 for i in range(sdb_ncols):
     for j in range(sdb_nrows):
         example = check_centre(i, j)
-        print(len(example))
         if len(example) == 45:
             crop_name = check_crop_data(i,j,sdb_gt,sdb_cs, crops)
             if crop_name != 'USELESS':
