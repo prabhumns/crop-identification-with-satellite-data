@@ -4,6 +4,7 @@ import numpy as np
 from numpy.linalg import inv
 import pickle
 from random import shuffle
+from shutil import copyfile
 base_month = '12'
 crops = {1:'CORN',4:'SORGHUM', 5:'SOYABEENS', 13:'POP OR ORN', 36:'ALFALFA', 28:'OATS', 27:'RYE', 53:'PEAS', 111:'WATER BODY', 121:'DEVELOPED', 122:'DEVELOPED', 123:'DEVELOPED', 124:'DEVELOPED',141:'FOREST', 142:'FOREST',243:'CABBAGE' }
 
@@ -109,7 +110,7 @@ def any_band_value(i, j, sdb, month):
 def check_other_month_satdata(i, j, sdb):
 	lit = os.listdir('./satdata')
 	band_values = {}
-	months_list = ['08','09','10','11'] #lit - [base_month]
+	months_list = ['07','08','09','10','11'] #lit - [base_month]
 	for month in months_list:
 		bandvalues = any_band_value(i,j, sdb, month)
 		if (bandvalues != np.array([0,0,0,0,0])).any():
@@ -162,9 +163,10 @@ def save_now(ss,pra, pick_pixel,base_month, data, linad):
 	dicti['base_month'] = base_month
 	dicti['data'] = data
 	dicti['list of base month files'] = linad
-	file_object = open('data_collect22.pkl', 'wb')
+	file_object = open('data_collect4.pkl', 'wb')
 	pickle.dump(dicti, file_object)
 	file_object.close()
+	copyfile ('data_collect4.pkl', 'data_collect4.bkp')
 
 def check(pixel,ss,pra,pick_pixel,base_month, linad, sdb,sdb_gt, sdb_cs, crops,data,fil):
 	if pra%10000 ==0:
@@ -199,7 +201,7 @@ if __name__ == '__main__':
 	month_folders = {month : os.listdir('./satdata/' +month) for month in os.listdir('./satdata')}
 	linad = month_folders[base_month]
 	try:
-		file_object = open('data_collect22.pkl', 'rb')
+		file_object = open('data_collect4.pkl', 'rb')
 		dicti = pickle.load(file_object)
 		file_object.close()
 		data = dicti['data']
@@ -230,3 +232,4 @@ if __name__ == '__main__':
 				print('done creating pick_pixel')
 			for pra in range(last_stop,len(pick_pixel)):
 				data = check(pick_pixel[pra],ss,pra,pick_pixel,base_month, linad, sdb,sdb_gt, sdb_cs, crops,data,fil)
+		exit()
