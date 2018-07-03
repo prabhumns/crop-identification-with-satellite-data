@@ -80,7 +80,13 @@ def check_centre(i,j):
     else:
         return []
 
-data = {}
+
+file_object = open('E:/Time Series/pra.pkl', 'rb')
+data2 = pickle.load(file_object)
+file_object.close()
+data = data2['data']
+t = data2['i']
+t = 91
 sdb = gdal.Open(sat_file)
 sdb_ncols = sdb.RasterXSize
 sdb_nrows = sdb.RasterYSize
@@ -88,7 +94,7 @@ sdb_gt = sdb.GetGeoTransform()
 sdb_cs = osr.SpatialReference()
 sdb_cs.ImportFromWkt(sdb.GetProjectionRef())
 sdb_data = gdal_array.DatasetReadAsArray(sdb,0,0,sdb_ncols, sdb_nrows)
-for i in range(sdb_ncols):
+for i in range(t, sdb_ncols):
     for j in range(sdb_nrows):
         example = check_centre(i, j)
         if len(example) == 45:
@@ -99,6 +105,8 @@ for i in range(sdb_ncols):
                 except KeyError:
                     data[crop_name] = [example]
     print('saving', i)
-    file_object = open('pra.pkl', 'wb')
-    pickle.dump(data,file_object)
+    data2['data'] = data
+    data2['i'] = i+1
+    file_object = open('E:/Time Series/pra.pkl', 'wb')
+    pickle.dump(data2,file_object)
     file_object.close()
