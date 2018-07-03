@@ -76,7 +76,7 @@ def check_centre(i,j):
     except IndexError:
         return []
     if (a != np.array([0,0,0,0,0])).any() and (b != np.array([0,0,0,0,0])).any() and (c != np.array([0,0,0,0,0])).any() and (d != np.array([0,0,0,0,0])).any() and (e != np.array([0,0,0,0,0])).any() and (f != np.array([0,0,0,0,0])).any() and (g != np.array([0,0,0,0,0])).any() and (h != np.array([0,0,0,0,0])).any() and (i != np.array([0,0,0,0,0])).any():
-        return [list(n) for n in [a,b,c,d,e,f,g,h,i]]
+        return [t for n in [a,b,c,d,e,f,g,h,i] for t in list(n)] 
     else:
         return []
 
@@ -91,6 +91,7 @@ sdb_data = gdal_array.DatasetReadAsArray(sdb,0,0,sdb_ncols, sdb_nrows)
 for i in range(sdb_ncols):
     for j in range(sdb_nrows):
         example = check_centre(i, j)
+        print(len(example))
         if len(example) == 45:
             crop_name = check_crop_data(i,j,sdb_gt,sdb_cs, crops)
             if crop_name != 'USELESS':
