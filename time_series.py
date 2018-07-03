@@ -5,6 +5,7 @@ from numpy.linalg import inv
 import pickle
 from random import shuffle
 from shutil import copyfile
+main_folder ='E:/Time Series'
 base_month = '12'
 crops = {1:'CORN',4:'SORGHUM', 5:'SOYABEENS', 13:'POP OR ORN', 36:'ALFALFA', 28:'OATS', 27:'RYE', 53:'PEAS', 111:'WATER BODY', 121:'DEVELOPED', 122:'DEVELOPED', 123:'DEVELOPED', 124:'DEVELOPED',141:'FOREST', 142:'FOREST',243:'CABBAGE' }
 
@@ -96,10 +97,10 @@ def each_file_checker(file, i,j, sdb):
 	else: return np.array([0,0,0,0,0])
 			
 def any_band_value(i, j, sdb, month):
-	lis = os.listdir('./satdata/'+month)
+	lis = os.listdir(main_folder + '/satdata/'+month)
 	for each_file in lis:
 		if each_file[-4:] == '.tif':
-			each_file2 = './satdata/'+month+'/'+each_file
+			each_file2 = main_folder + '/satdata/'+month+'/'+each_file
 			band_values = each_file_checker(each_file2, i,j, sdb)
 			if (band_values != np.array([0,0,0,0,0])).any():
 				return band_values
@@ -108,7 +109,7 @@ def any_band_value(i, j, sdb, month):
 			
 
 def check_other_month_satdata(i, j, sdb):
-	lit = os.listdir('./satdata')
+	lit = os.listdir(main_folder + '/satdata')
 	band_values = {}
 	months_list = ['07','08','09','10','11'] #lit - [base_month]
 	for month in months_list:
@@ -122,10 +123,10 @@ def check_other_month_satdata(i, j, sdb):
 
 
 def Crop(i,j, sdb_gt, sdb_cs):
-	lis = os.listdir('./crop_data')
+	lis = os.listdir(main_folder + '/crop_data')
 	for crop_file in lis:
 		if crop_file[-4:] == '.tif':
-			cd = gdal.Open('./crop_data/' + crop_file)
+			cd = gdal.Open(main_folder + '/crop_data/' + crop_file)
 			cd_gt = cd.GetGeoTransform()
 			cd_cs = osr.SpatialReference()
 			cd_cs.ImportFromWkt(cd.GetProjectionRef())
@@ -163,7 +164,7 @@ def save_now(ss,pra, pick_pixel,base_month, data, linad):
 	dicti['base_month'] = base_month
 	dicti['data'] = data
 	dicti['list of base month files'] = linad
-	file_object = open('data_collect4.pkl', 'wb')
+	file_object = open(main_folder + '/data_collect4.pkl', 'wb')
 	pickle.dump(dicti, file_object)
 	file_object.close()
 	copyfile ('data_collect4.pkl', 'data_collect4.bkp')
@@ -198,10 +199,10 @@ def check(pixel,ss,pra,pick_pixel,base_month, linad, sdb,sdb_gt, sdb_cs, crops,d
 			#check((i+1, j+1), pixelTF,n,ss,pra,pick_pixel,base_month, linad, sdb,sdb_gt, sdb_cs, crops,data,fil)
 
 if __name__ == '__main__':
-	month_folders = {month : os.listdir('./satdata/' +month) for month in os.listdir('./satdata')}
+	month_folders = {month : os.listdir(main_folder + '/satdata/' +month) for month in os.listdir(main_folder + '/satdata')}
 	linad = month_folders[base_month]
 	try:
-		file_object = open('data_collect4.pkl', 'rb')
+		file_object = open(main_folder + '/data_collect4.pkl', 'rb')
 		dicti = pickle.load(file_object)
 		file_object.close()
 		data = dicti['data']
@@ -219,7 +220,7 @@ if __name__ == '__main__':
 	for ss in range(sss, len(linad)):
 		fil = linad[ss]
 		if fil[-4:] == '.tif':
-			sdb = gdal.Open('./satdata/'+base_month + '/' + fil)
+			sdb = gdal.Open(main_folder + '/satdata/'+base_month + '/' + fil)
 			sdb_ncols = sdb.RasterXSize
 			sdb_nrows = sdb.RasterYSize
 			sdb_gt = sdb.GetGeoTransform()

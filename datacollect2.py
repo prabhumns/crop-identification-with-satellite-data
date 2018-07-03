@@ -1,7 +1,7 @@
 from osgeo import osr, gdal
 import sys
 import pandas as pd
-
+main_folder = 'E:/Time Series'
 def Convert(i,j, sd_gt, sd_cs, cd_cs):
     transform = osr.CoordinateTransformation(sd_cs,cd_cs)
     o1 = sd_gt[0] + i *sd_gt[1] + j*sd_gt[2]
