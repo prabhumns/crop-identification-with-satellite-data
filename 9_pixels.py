@@ -82,10 +82,11 @@ def check_centre(i,j):
 
 
 file_object = open('E:/Time Series/pra.pkl', 'rb')
-data2 = pickle.load(file_object)
+data = pickle.load(file_object)
 file_object.close()
-data = data2['data']
-t = data2['i']
+#data = data2['data']
+#t = data2['i']
+data2 = {}
 t = 91
 sdb = gdal.Open(sat_file)
 sdb_ncols = sdb.RasterXSize
@@ -109,4 +110,4 @@ for i in range(t, sdb_ncols):
     data2['i'] = i+1
     file_object = open('E:/Time Series/pra.pkl', 'wb')
     pickle.dump(data2,file_object)
-    file_object.close()
+    file_object.close(); exit()

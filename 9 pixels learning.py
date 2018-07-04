@@ -4,19 +4,23 @@ from random import shuffle
 import numpy as np
 from sklearn.utils import shuffle as shf
 import tensorflow as tf
+import time
+
+tf.logging.set_verbosity(tf.logging.INFO)
 
 def nn_model_fn(features, labels, mode):
-	input_layer = tf.layers.Input(
+	input_layer = features["x"]
+	'''tf.layers.Input(
 				shape = (45, ), 
 				batch_size = None,  
 				name = "zeroth or input layer", 
 				dtype = tf.float64,
 				sparse = False,
 				tensor = None
-				)
+				)'''
 	dense1 = tf.layers.dense(
 				inputs=input_layer, 
-				units=1024, #number of neurons 
+				units= 15, #number of neurons 
 				activation=tf.nn.relu,
 				use_bias= True,
 				kernel_initializer=None, #initial weight available if any
@@ -27,12 +31,46 @@ def nn_model_fn(features, labels, mode):
 				kernel_constraint = None,
 				bias_constraint= None,
 				trainable= True,
-				name = 'First Hidden layer or first layer',
+				name = None,
+				reuse = None
+				)
+
+	dense2 = tf.layers.dense(
+				inputs=dense1, 
+				units= 10, #number of neurons 
+				activation=tf.nn.relu,
+				use_bias= True,
+				kernel_initializer=None, #initial weight available if any
+				bias_initializer= None, #similar to previous
+				kernel_regularizer= None, #different degularisation for each layer
+				bias_regularizer= None, 
+				activity_regularizer= None,
+				kernel_constraint = None,
+				bias_constraint= None,
+				trainable= True,
+				name = None,
+				reuse = None
+				)
+
+	dense3 = tf.layers.dense(
+				inputs=dense2, 
+				units= 10, #number of neurons 
+				activation=tf.nn.relu,
+				use_bias= True,
+				kernel_initializer=None, #initial weight available if any
+				bias_initializer= None, #similar to previous
+				kernel_regularizer= None, #different degularisation for each layer
+				bias_regularizer= None, 
+				activity_regularizer= None,
+				kernel_constraint = None,
+				bias_constraint= None,
+				trainable= True,
+				name = None,
 				reuse = None
 				)
 	
 	logits = tf.layers.dense(
-				inputs=dense1, 
+				inputs=dense3, 
 				units=5, #number of neurons 
 				activation= None,
 				use_bias= True,
@@ -44,10 +82,10 @@ def nn_model_fn(features, labels, mode):
 				kernel_constraint = None,
 				bias_constraint= None,
 				trainable= True,
-				name = 'Output layer or second layer',
+				name = None,
 				reuse = None
 				)
-	print(type(logits))
+
 	predictions = {
 				"classes": tf.argmax(input=logits, axis=1),
 				"probabilities": tf.nn.softmax(logits, name="softmax_tensor") #it applies softmax to the value given by logits
@@ -55,15 +93,12 @@ def nn_model_fn(features, labels, mode):
 
 	if mode == tf.estimator.ModeKeys.PREDICT:
 		return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
-
-  # Calculate Loss (for both TRAIN and EVAL modes)
-  	onehot_labels = tf.one_hot(indices = tf.cast(labels, tf.int32), depth = 5)
-
-	loss = tf.losses.sparse_softmax_cross_entropy(onehot_labels=onehot_labels, logits=logits) #make sure that the activation for logits is none
+	
+	loss = tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits) #make sure that the activation for logits is none
 
   # Configure the Training Op (for TRAIN mode)
 	if mode == tf.estimator.ModeKeys.TRAIN:
-		optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.001)
+		optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.1)
 		t = time.time()
 		train_op = optimizer.minimize(
 			loss=loss, #this is just dataloss, not with regularization term. correction for regularisation happens along with training
@@ -99,7 +134,7 @@ if __name__ == '__main__':
 	test_labels = []
 	cv_examples = []
 	cv_labels = []
-	i = 1
+	i = 0
 	for key, value in data.items():
 		training_examples = training_examples + value[:5000]
 		cv_examples = cv_examples + value[5000:5500]
@@ -119,7 +154,7 @@ if __name__ == '__main__':
 
 
 	my_classifier = tf.estimator.Estimator(
-		model_fn=nn_model_fn, model_dir="E:/crop_identification_with_satellite_data/crop_identification_with_satellite_data") #Use this directory
+		model_fn=nn_model_fn, model_dir="E:/crop_identification_with_satellite_data/crop_identification_with_satellite_data/tf_files") #Use this directory
 	
 	tensors_to_log = {"probabilities": "softmax_tensor"}
 	
@@ -136,13 +171,14 @@ if __name__ == '__main__':
 	my_classifier.train(
 				input_fn=training_input_fn,
 				steps=20000,
-				hooks=[logging_hook]) #training
+				hooks=[logging_hook])
 	
 	cv_input_fn = tf.estimator.inputs.numpy_input_fn(
-				x={"x": eval_data},
-				y=eval_labels,
+				x={"x": cv_examples},
+				y= cv_labels,
 				num_epochs=1,
 				shuffle=False)
 
 	eval_results = my_classifier.evaluate(input_fn=cv_input_fn)
+
 	print(eval_results)
