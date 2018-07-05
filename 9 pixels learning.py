@@ -7,25 +7,20 @@ import tensorflow as tf
 import time
 
 tf.logging.set_verbosity(tf.logging.INFO)
+regularizer = tf.contrib.layers.l2_regularizer(scale = 0.1)
+print(regularizer)
 
 def nn_model_fn(features, labels, mode):
-	input_layer = features["x"]
-	'''tf.layers.Input(
-				shape = (45, ), 
-				batch_size = None,  
-				name = "zeroth or input layer", 
-				dtype = tf.float64,
-				sparse = False,
-				tensor = None
-				)'''
+	input_layer = tf.reshape(features["x"], [-1,45])
+
 	dense1 = tf.layers.dense(
 				inputs=input_layer, 
-				units= 15, #number of neurons 
+				units= 30, #number of neurons 
 				activation=tf.nn.relu,
 				use_bias= True,
 				kernel_initializer=None, #initial weight available if any
 				bias_initializer= None, #similar to previous
-				kernel_regularizer= None, #different degularisation for each layer
+				kernel_regularizer= regularizer, #different degularisation for each layer
 				bias_regularizer= None, 
 				activity_regularizer= None,
 				kernel_constraint = None,
@@ -37,12 +32,12 @@ def nn_model_fn(features, labels, mode):
 
 	dense2 = tf.layers.dense(
 				inputs=dense1, 
-				units= 10, #number of neurons 
+				units= 30, #number of neurons 
 				activation=tf.nn.relu,
 				use_bias= True,
 				kernel_initializer=None, #initial weight available if any
 				bias_initializer= None, #similar to previous
-				kernel_regularizer= None, #different degularisation for each layer
+				kernel_regularizer= regularizer, #different degularisation for each layer
 				bias_regularizer= None, 
 				activity_regularizer= None,
 				kernel_constraint = None,
@@ -59,7 +54,24 @@ def nn_model_fn(features, labels, mode):
 				use_bias= True,
 				kernel_initializer=None, #initial weight available if any
 				bias_initializer= None, #similar to previous
-				kernel_regularizer= None, #different degularisation for each layer
+				kernel_regularizer= regularizer, #different degularisation for each layer
+				bias_regularizer= None, 
+				activity_regularizer= None,
+				kernel_constraint = None,
+				bias_constraint= None,
+				trainable= True,
+				name = None,
+				reuse = None
+				)
+
+	dense4 = tf.layers.dense(
+				inputs=dense3, 
+				units= 10, #number of neurons 
+				activation=tf.nn.relu,
+				use_bias= True,
+				kernel_initializer=None, #initial weight available if any
+				bias_initializer= None, #similar to previous
+				kernel_regularizer= regularizer, #different degularisation for each layer
 				bias_regularizer= None, 
 				activity_regularizer= None,
 				kernel_constraint = None,
@@ -70,13 +82,13 @@ def nn_model_fn(features, labels, mode):
 				)
 	
 	logits = tf.layers.dense(
-				inputs=dense3, 
+				inputs=dense4, 
 				units=5, #number of neurons 
 				activation= None,
 				use_bias= True,
 				kernel_initializer=None, #initial weight available if any
 				bias_initializer= None, #similar to previous
-				kernel_regularizer= None, #different degularisation for each layer
+				kernel_regularizer= regularizer, #different degularisation for each layer
 				bias_regularizer= None, 
 				activity_regularizer= None,
 				kernel_constraint = None,
@@ -98,7 +110,7 @@ def nn_model_fn(features, labels, mode):
 
   # Configure the Training Op (for TRAIN mode)
 	if mode == tf.estimator.ModeKeys.TRAIN:
-		optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.1)
+		optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.00001, use_locking=True)
 		t = time.time()
 		train_op = optimizer.minimize(
 			loss=loss, #this is just dataloss, not with regularization term. correction for regularisation happens along with training
@@ -114,19 +126,20 @@ def nn_model_fn(features, labels, mode):
 
 if __name__ == '__main__':
 	file_object = open('E:/Time Series/pra.pkl', 'rb')
-	data = pickle.load(file_object)
+	data2 = pickle.load(file_object)
 	file_object.close()
+	data = data2['data']
 
 	data = {key:value[:6000] for key, value in data.items() if len(value) >= 6000}
 
+	mins = {}; maxs = {}; means = {}
 	for i in range(45):
 		lin = [l[i] for value in data.values() for l in value]
-		mins = min(lin)
-		maxs = max(lin)
-		means = mean(lin)
-		for key, value in data.items():
-			for example in value:
-				example[i] = np.float64((example[i] - means)/(maxs-mins))
+		mins[i] = min(lin)
+		maxs[i] = max(lin)
+		means[i] = mean(lin)
+	
+	data = {key: [[np.float64((example[i]-means[i])/(maxs[i] - mins[i])) for i in range(45)] for example in value] for key, value in data.items()}	
 
 	training_examples = []
 	training_labels = []
@@ -159,7 +172,7 @@ if __name__ == '__main__':
 	tensors_to_log = {"probabilities": "softmax_tensor"}
 	
 	logging_hook = tf.train.LoggingTensorHook(
-				tensors=tensors_to_log, every_n_iter=10)
+				tensors=tensors_to_log, every_n_iter=1000)
 	
 	training_input_fn = tf.estimator.inputs.numpy_input_fn(
 				x={"x": training_examples},
@@ -170,7 +183,7 @@ if __name__ == '__main__':
 				 #input function takes our data and gives whenever asked
 	my_classifier.train(
 				input_fn=training_input_fn,
-				steps=20000,
+				steps=200000,
 				hooks=[logging_hook])
 	
 	cv_input_fn = tf.estimator.inputs.numpy_input_fn(
