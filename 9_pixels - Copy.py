@@ -1,11 +1,13 @@
 import h5py
 import tables
 import time
+import gc
 from osgeo import gdal, osr, ogr, gdal_array
 import os
 import numpy as np
 from numpy.linalg import inv
 import _pickle as pickle
+from random import shuffle
 from shutil import copyfile
 
 sat_file = 'E:/Time Series/satdata/12/1557907_2016-12-29_RE1_3A_Analytic.tif'
@@ -82,12 +84,20 @@ def check_centre(i,j):
 		return [t for n in [a,b,c,d,e,f,g,h,i] for t in list(n)] 
 	else:
 		return []
-	
+
+data = {}
+print('loading data')
+for key in os.listdir('E:/Time Series/hdf_files'):
+	filename = 'E:/Time Series/hdf_files/'+ key
+	f = h5py.File(filename, 'r')
+	data[key] = list(list(f.values())[0])
+	f.close()
+
 file_object = open('E:/Time Series/9_pixels.pkl', 'rb')
 t = pickle.load(file_object)
 file_object.close()
+print('done loading')
 print(t)
-data = {}
 sdb = gdal.Open(sat_file)
 sdb_ncols = sdb.RasterXSize
 sdb_nrows = sdb.RasterYSize
@@ -106,24 +116,22 @@ for i in range(t, sdb_ncols):
 				except KeyError:
 					data[crop_name] = [example]
 	print(i)
-	if i%100 == 0:
-		print('saving', i)
-		t = time.time()
-		for key, value in data.items():
-			key1 = 'E:/Time Series/hdf_files/'+key
-			key2 = 'E:/Time Series/hdf_files_backup/'+key+'.bkp'
-			f = h5py.File(key1, 'r')
-			old_examples = list(list(f.values())[0])
-			f.close()
-			h5file = tables.open_file(key1, mode='w', title="Test Array")
-			root  = h5file.root
-			h5file.create_array(root, "test", old_examples + value)
-			h5file.close()
-			copyfile(key1, key2)
-			print(key, '----', len(old_examples + value))
-		file_object = open('E:/Time Series/9_pixels.pkl', 'wb')
-		pickle.dump(i+1, file_object)
-		file_object.close()
-		copyfile('E:/Time Series/9_pixels.pkl','E:/Time Series/9_pixels.bkp' )
-		print('done saving!', time.time() - t)
-		data = {}
+	if i%10 == 0:
+		if input('save? Y or N: ') == 'Y':
+			print('saving', i)
+			t = time.time()
+			for key, value in data.items():
+				if key in ['ALFALFA', 'CORN', 'DEVELOPED', 'FOREST', 'OATS', 'SOYABEENS']: continue
+				key1 = 'E:/Time Series/hdf_files/'+key
+				key2 = 'E:/Time Series/hdf_files_backup/'+key+'.bkp'
+				h5file = tables.open_file(key1, mode='w', title="Test Array")
+				root  = h5file.root
+				h5file.create_array(root, "test", value)
+				h5file.close()
+				copyfile(key1, key2)
+				print(key, '----', len(value))
+			file_object = open('E:/Time Series/9_pixels.pkl', 'wb')
+			pickle.dump(i+1, file_object)
+			file_object.close()
+			copyfile('E:/Time Series/9_pixels.pkl','E:/Time Series/9_pixels.bkp' )
+			print('done saving time: ', time.time()-t); exit()
