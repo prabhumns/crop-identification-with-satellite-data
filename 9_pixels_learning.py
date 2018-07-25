@@ -139,7 +139,7 @@ def learn():
 		print(key, '---', len(value))
 		shuffle(data[key])
 	
-	data = {key:value for key, value in data.items()}
+	data = {key:value[:10000] for key, value in data.items() if len(value) >= 20000}
 	
 	mins = {}; maxs = {}; means = {}
 	for i in range(45):
@@ -207,3 +207,4 @@ def learn():
 	eval_results = my_classifier.evaluate(input_fn=cv_input_fn)
 
 	print(eval_results)'''
+learn()

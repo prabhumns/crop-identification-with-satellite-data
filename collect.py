@@ -1,11 +1,69 @@
+import simplejson
 import os
 import requests
-from requests.auth import HTTPBasicAuth
-import json
 import time
-import sys
+import sys	
+import pickle
+import json
+from shapely.geometry import shape, Point
+import urllib3
 
-def location_date_cloud_satellite(l,start_date, end_date, cloud_cover_less = 0.05, satellite = "REOrthoTile"):
+def get_que_files():
+	try:
+		file_object = open('collect.pkl','rb')
+		in_queue_files = pickle.load(file_object)
+		file_object.close()
+	except FileNotFoundError:
+		in_queue_files = []
+	return in_queue_files
+
+def check_queue():
+	in_queue_files = get_que_files()
+	while {} in in_queue_files:
+		in_queue_files.remove({})
+	lit = []
+	for i in in_queue_files:
+		if i in lit:
+			continue
+		lit.append(i)
+	file_object = open('collect.pkl','wb')
+	pickle.dump(lit, file_object)
+	file_object.close()
+
+def check_for_any_changes_satdata():
+	check_queue()
+	in_queue_files = get_que_files()
+	for i in range(len(in_queue_files)):
+		dicti = in_queue_files[i]
+		if dicti['status'] != 'downloaded':
+			lis = os.listdir('./'+dicti['month'])
+			image = dicti['image']
+			if image['id'] in lis:
+				dicti['status'] = 'downloaded'
+				in_queue_files[i] = dicti
+	file_object = open('collect.pkl', 'wb')
+	pickle.dump(in_queue_files, file_object)
+	file_object.close()
+
+def check_in_downloading_image(coordinate, image):
+	polygon = shape(image['geometry'])
+	point = Point(coordinate[0], coordinate[1])
+	return polygon.contains(point)
+
+def check_in_queue_files(coordinate,year, month):
+	check_queue()
+	in_queue_files = get_que_files()
+	for i in in_queue_files:
+		if len(i) == 0:
+			print (i)
+	for i in in_queue_files:
+		if i['month'] == month and i['year'] == year:
+			if check_in_downloading_image(coordinate, i['image']):
+				return True
+	return False
+			
+
+def location_date_cloud_satellite(l,start_date, end_date, cloud_cover_less = 0.10, satellite = "REOrthoTile"):
 	if type(l[0]) == list:
 		geo_json_geometry = {"type": "Polygon","coordinates": [l]}
 	elif type(l[0]) == float:
@@ -18,65 +76,167 @@ def location_date_cloud_satellite(l,start_date, end_date, cloud_cover_less = 0.0
 	search_endpoint_request = {"item_types": [satellite], "filter": redding_reservoir}
 	return search_endpoint_request
 
-l = [[-90.000, 40.000],[-90.000,30.000],[-80.000,30.0000],[-80.0000,40.0000]]
-start_date = "2016-01-"
-end_date = "2017-07-30"
-cloud_cover_less = 0.05
-ser = location_date_cloud_satellite(l,start_date, end_date, cloud_cover_less = cloud_cover_less)
+def download_images():
+	check_queue()
+	in_queue_files = get_que_files()
+	for i in range(len(in_queue_files)):
+		dicti = in_queue_files[i]
+		if dicti['status'] == 'download not started':
+			image = dicti['image']
+			session = requests.Session()
+			login = True
+			while login: #logging into session
+				try:
+					session.auth = (emailid, password)
+					login = False
+				except NameError:
+					emailid = input('Email Id: ')
+					password = input('Password: ')
+				except requests.exceptions.ConnectionError:
+					print('check network connection')
+					time.sleep(2)
+			asset_type = "analytic"
+			login = True
+			while login: #getting activation link
+				try:
+					item = session.get(image['_links']['assets'])
+				except requests.exceptions.ConnectionError:
+					print('check network connection')
+					time.sleep(2)
+					continue
+				if asset_type in item.json():
+					item_activation_url = item.json()[asset_type]["_links"]["activate"]
+					login = False
+				elif 'message' in item.json():
+					print ("wrong login details")
+					emailid = input('Emailid: ' )
+					password = input('Password: ')
+					session.auth = (emailid, password)
+				else:
+					print ("account expired")
+					emailid = input('Emailid: ' )
+					password = input('Password: ')
+					session.auth = (emailid, password)
+			login = True
+			while login: #activating
+				try:
+					session.post(item_activation_url) 
+					login = False
+				except requests.exceptions.ConnectionError:
+					print('check network connection')
+					time.sleep(2)
+			download_image(dicti, emailid, password, in_queue_files, i, session)
+		elif dicti['status'] == 'downloading started':
+			session = requests.Session()
+			session.auth = (dicti['emailid'], dicti['password'])
+			download_image(dicti, dicti['emailid'], dicti['password'], in_queue_files, i, session)
 
-emailid = "me16b022@smail.iitm.ac.in"
-password = "howareyou"
-session = requests.Session()
-session.auth = (emailid,password) 
-search_result = session.post('https://api.planet.com/data/v1/quick-search', json=ser).json()
+def image_accounted(emailid, password, dicti, in_queue_files, i):
+	dicti['emailid'] = emailid
+	dicti['password'] = password
+	dicti['status'] = 'downloading started'
+	in_queue_files[i] = dicti
+	file_object = open('collect.pkl', 'wb')
+	pickle.dump(in_queue_files, file_object)
+	file_object.close()
+	return dicti
+		
 
-def download(image, session):
-    item_id = image['id']
-    item = session.get(image['_links']['assets'])
-    asset_type = "analytic"
-    session.auth = (emailid,password) 
-    item_activation_url = item.json()[asset_type]["_links"]["activate"] #link to activate
-    response = session.post(item_activation_url) #activating
-    
-    item_status = item.json()[asset_type]["status"]
-    while item_status != 'active':
-        time.sleep(2) 
-        print('still inactive')
-        item = session.get(image['_links']['assets'])
-        item_status = item.json()[asset_type]["status"]
+def download_image(dicti, emailid, password, in_queue_files, i, session):
+	image = dicti['image']
+	asset_type = "analytic"
+	login =  True
+	while login :
+		try:
+			item = session.get(image['_links']['assets'])
+			login = False
+		except requests.exceptions.ConnectionError:
+			print('check network connection')
+			time.sleep(2)
+	item_status = item.json()[asset_type]["status"]
+	while item_status != 'active': 
+		time.sleep(2)
+		login = True
+		while login:
+			try:
+				item = session.get(image['_links']['assets'])
+				login = False
+			except requests.exceptions.ConnectionError:
+				print('check network connection')
+				time.sleep(2)
+		item_status = item.json()[asset_type]["status"]
+	download_link = item.json()[asset_type]["location"]
+	file_name = dicti['image']['id'] + '.tif'
+	with open(file_name, "wb") as f:
+		print ("Downloading %s" % file_name)
+		response = requests.get(download_link, stream=True)
+		if dicti['status'] != 'downloading started':
+			dicti = image_accounted(emailid, password, dicti, in_queue_files, i)
+		total_length = response.headers.get('content-length')
+		if total_length is None: # no content length header
+			f.write(response.content)
+		else:
+			dl = 0
+			total_length = int(total_length)
+			for data in response.iter_content(chunk_size=4096):
+				dl += len(data)
+				f.write(data)
+				done = int(50 * dl / total_length)
+				sys.stdout.write("\r[%s%s]" % ('=' * done, ' ' * (50-done)) )    
+				sys.stdout.flush()
+	month = dicti['month']; year = dicti['year']
+	os.rename('./'+file_name, './satdata/'+year+'/' + month+'/'+file_name)
+	dicti['status'] = 'downloaded'
+	in_queue_files[i] = dicti
+	file_object = open('collect.pkl', 'wb')
+	pickle.dump(in_queue_files, file_object)
+	file_object.close() 
 
-    download_link = item.json()[asset_type]["location"]
-    file_name = item_id + '.tif'
-    with open(file_name, "wb") as f:
-            print ("Downloading %s" % file_name)
-            response = session.get(download_link, stream=True)
-            total_length = response.headers.get('content-length')
-            if total_length is None: # no content length header
-                f.write(response.content)
-            else:
-                dl = 0
-                total_length = int(total_length)
-                for data in response.iter_content(chunk_size=4096):
-                    dl += len(data)
-                    f.write(data)
-                    done = int(50 * dl / total_length)
-                    sys.stdout.write("\r[%s%s]" % ('=' * done, ' ' * (50-done)) )    
-                    sys.stdout.flush()
-    return file_name
-    
-month_wise_images = {}
-for single_image in search_result['features']:
-    try:
-        month_wise_images[single_image['properties']['acquired'][5:7]].append(single_image)
-    except KeyError:
-        month_wise_images[single_image['properties']['acquired'][5:7]] = [single_image]
-
-downloading_images = []
-for key, value in month_wise_images.items():
-    print (len(value),' images are available for this AOI belonging to ', key, 'th month')
-    downloading_images.append(value[0])
-
-for image in downloading_images:
-    file_name = download(image, session)
-    cwd = os.getcwd()
-    os.rename(cwd+'\\'+file_name, cwd+'\\'+single_image['properties']['acquired'][5:7] + '\\'+file_name)
+def find_image(coordinate,year, month, cloud_cover):
+	if check_in_queue_files(coordinate,year, month):
+		return {}
+	else:
+		l = [coordinate[0], coordinate[1]]
+		start_date = year + "-"+ month + "-01"
+		one = ['01','03','05','07','08','10','12']
+		zero = ['04','06','09','11']
+		if month in one:
+			end_date = year + "-" + month + "-31"
+		elif month in zero:
+			end_date = year + "-" + month + "-30"
+		else:
+			if int(year)%4 ==0:end_date = year + "-02-29"
+			else: end_date = year + "-02-28"
+		ser = location_date_cloud_satellite(l,start_date, end_date, cloud_cover_less = cloud_cover)
+		session = requests.Session()
+		emailid = 'prabhumns123@gmail.com'
+		password = 'prabhu123'
+		login = True
+		while login:
+			try:
+				session.auth = (emailid,password)
+				login = False
+			except requests.exceptions.ConnectionError:
+				print('check network connection')
+				time.sleep(2)
+		login = True
+		while login:
+			try:
+				search_result = session.post('https://api.planet.com/data/v1/quick-search', json=ser).json()
+				login = False
+			except requests.exceptions.ConnectionError:
+				print('check network connection')
+				time.sleep(2)
+			except simplejson.scanner.JSONDecodeError:time.sleep(1)
+		list_of_images = search_result["features"]
+		if len(list_of_images) == 0: return {}
+		else: return {'month':month, 'image':list_of_images[0],'year':year, 'status': 'download not started'}
+			
+def add_to_queue(listi):
+	print('adding files to queue')
+	check_queue()
+	in_queue_files = get_que_files()
+	in_queue_files = listi + in_queue_files
+	file_object = open('collect.pkl', 'wb')
+	pickle.dump(in_queue_files, file_object)
+	file_object.close()

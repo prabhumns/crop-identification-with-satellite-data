@@ -111,20 +111,12 @@ if __name__ == '__main__':
 			example = check_centre(i, j)
 			if len(example) == 45:
 				crop_name = check_crop_data(i,j,sdb_gt,sdb_cs, crops)
-				if crop_name != 'USELESS':
-					if crop_name in num:
-						if num[crop_name] < 20000:
-							try:
-								data[crop_name].append(example)
-							except KeyError:
-								data[crop_name] = [example]
-							num[crop_name] =num[crop_name]+1
-					else:
-						try:
-							data[crop_name].append(example)
-						except KeyError:
-							data[crop_name] = [example]
-						num[crop_name] =num[crop_name]+1
+				if crop_name != 'USELESS' and num[crop_name]<20000:
+					try:
+						data[crop_name].append(example)
+					except KeyError:
+						data[crop_name] = [example]
+					num[crop_name] =num[crop_name]+1
 		print(i)
 		if i%100 == 0:
 			print('saving', i)
