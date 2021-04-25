@@ -134,4 +134,4 @@ for i in range(t, sdb_ncols):
 			pickle.dump(i+1, file_object)
 			file_object.close()
 			copyfile('E:/Time Series/9_pixels.pkl','E:/Time Series/9_pixels.bkp' )
-			print('done saving time: ', time.time()-t); exit()
+			print('done saving time: ', time.time()-t);
